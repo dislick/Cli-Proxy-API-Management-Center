@@ -71,6 +71,8 @@ export interface AuthFileItem {
   modified?: number;
   priority?: number;
   weight?: number;
+  /** Codex `quota_reserve_percent`, present only when an active reserve (> 0) is set. */
+  quotaReservePercent?: number;
   note?: string;
   success?: unknown;
   failed?: unknown;

@@ -25,6 +25,8 @@ const makeEditor = (json: Record<string, unknown>, weight: string): PrefixProxyE
   priority: '',
   weight,
   weightError: null,
+  quotaReserve: '',
+  quotaReserveError: null,
   disableCooling: false,
   disableCoolingTouched: false,
   websockets: false,

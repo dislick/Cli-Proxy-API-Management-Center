@@ -22,6 +22,7 @@ import {
   readAuthFileWebsockets,
   readAuthFileUsingApi,
   readAuthFileUseSiwc,
+  supportsAuthFileQuotaReserve,
   supportsAuthFileSiwc,
   supportsAuthFileWebsockets,
   supportsAuthFileUsingApi,
@@ -32,6 +33,11 @@ import {
   validateCredentialWeightText,
   type CredentialWeightError,
 } from '@/utils/credentialWeight';
+import {
+  isValidQuotaReserveText,
+  parseQuotaReserveText,
+  readQuotaReservePercent,
+} from '@/utils/quotaReserve';
 
 type AuthFileHeaders = Record<string, string>;
 type AuthFileHeadersErrorKey =
@@ -41,7 +47,9 @@ type AuthFileHeadersErrorKey =
 type AuthFileContentErrorKey =
   'auth_files.prefix_proxy_invalid_json' | 'auth_files.prefix_proxy_html_challenge';
 type AuthFileWeightErrorKey = 'auth_files.weight_invalid_integer' | 'auth_files.weight_invalid_max';
-type AuthFileEditorErrorKey = AuthFileHeadersErrorKey | AuthFileWeightErrorKey;
+type AuthFileQuotaReserveErrorKey = 'auth_files.quota_reserve_invalid';
+type AuthFileEditorErrorKey =
+  AuthFileHeadersErrorKey | AuthFileWeightErrorKey | AuthFileQuotaReserveErrorKey;
 
 export type PrefixProxyEditorField =
   | CredentialPolicyField
@@ -49,6 +57,7 @@ export type PrefixProxyEditorField =
   | 'proxyUrl'
   | 'priority'
   | 'weight'
+  | 'quotaReserve'
   | 'disableCooling'
   | 'websockets'
   | 'usingApi'
@@ -76,6 +85,9 @@ export type PrefixProxyEditorState = {
   priority: string;
   weight: string;
   weightError: string | null;
+  /** Codex-only `quota_reserve_percent` editor text; empty disables the reserve. */
+  quotaReserve: string;
+  quotaReserveError: string | null;
   disableCooling: boolean;
   disableCoolingTouched: boolean;
   websockets: boolean;
@@ -335,6 +347,20 @@ export const buildAuthFileFieldsPatch = (
     patch.weight = nextWeight;
   }
 
+  if (supportsAuthFileQuotaReserve(editor.providerKey)) {
+    const quotaReserveText = editor.quotaReserve ?? '';
+    if (!isValidQuotaReserveText(quotaReserveText)) {
+      throw new Error(resolveError('auth_files.quota_reserve_invalid'));
+    }
+    const originalReserve = readQuotaReservePercent(original.quota_reserve_percent);
+    const nextReserve = parseQuotaReserveText(quotaReserveText);
+    if (nextReserve === undefined) {
+      if (originalReserve !== undefined) patch.quota_reserve_percent = null;
+    } else if (nextReserve !== originalReserve) {
+      patch.quota_reserve_percent = nextReserve;
+    }
+  }
+
   if (editor.disableCoolingTouched) {
     const originalDisableCooling = readAuthFileDisableCooling(original);
     const nextDisableCooling = Boolean(editor.disableCooling);
@@ -441,6 +467,11 @@ const buildPrefixProxyUpdatedText = (
     }
   }
 
+  if (patch.quota_reserve_percent !== undefined) {
+    // CPA stores the explicit null it receives, which disables the reserve.
+    next.quota_reserve_percent = patch.quota_reserve_percent;
+  }
+
   if (patch.disable_cooling !== undefined) {
     next.disable_cooling = patch.disable_cooling;
   }
@@ -495,6 +526,7 @@ export function useAuthFilesPrefixProxyEditor(
   const hasBlockingValidationError = Boolean(
     (prefixProxyEditor?.headersTouched && prefixProxyEditor.headersError) ||
     prefixProxyEditor?.weightError ||
+    prefixProxyEditor?.quotaReserveError ||
     credentialPolicyError(prefixProxyEditor?.policy)
   );
   const prefixProxyUpdatedText =
@@ -546,6 +578,8 @@ export function useAuthFilesPrefixProxyEditor(
       priority: '',
       weight: '',
       weightError: null,
+      quotaReserve: '',
+      quotaReserveError: null,
       disableCooling: false,
       disableCoolingTouched: false,
       websockets: false,
@@ -602,6 +636,9 @@ export function useAuthFilesPrefixProxyEditor(
       const proxyUrl = typeof json.proxy_url === 'string' ? json.proxy_url : '';
       const priority = parsePriorityValue(json.priority);
       const weight = readCredentialWeight(json.weight);
+      const quotaReserve = supportsAuthFileQuotaReserve(providerKey)
+        ? readQuotaReservePercent(json.quota_reserve_percent)
+        : undefined;
       const disableCooling = readAuthFileDisableCooling(json);
       const websockets = supportsAuthFileWebsockets(providerKey)
         ? readAuthFileWebsockets(json)
@@ -634,6 +671,8 @@ export function useAuthFilesPrefixProxyEditor(
           priority: priority !== undefined ? String(priority) : '',
           weight: weight !== undefined ? String(weight) : '',
           weightError: null,
+          quotaReserve: quotaReserve !== undefined ? String(quotaReserve) : '',
+          quotaReserveError: null,
           disableCooling,
           disableCoolingTouched: false,
           websockets,
@@ -690,6 +729,16 @@ export function useAuthFilesPrefixProxyEditor(
           ...prev,
           weight,
           weightError: error ? t(credentialWeightErrorKey(error)) : null,
+        };
+      }
+      if (field === 'quotaReserve') {
+        const quotaReserve = String(value);
+        return {
+          ...prev,
+          quotaReserve,
+          quotaReserveError: isValidQuotaReserveText(quotaReserve)
+            ? null
+            : t('auth_files.quota_reserve_invalid'),
         };
       }
       if (field === 'disableCooling') {

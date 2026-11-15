@@ -13,11 +13,13 @@ import type {
   PrefixProxyEditorState,
 } from '@/features/authFiles/hooks/useAuthFilesPrefixProxyEditor';
 import {
+  supportsAuthFileQuotaReserve,
   supportsAuthFileSiwc,
   supportsAuthFileUsingApi,
   supportsAuthFileWebsockets,
 } from '@/features/authFiles/constants';
 import { MAX_CREDENTIAL_WEIGHT } from '@/utils/credentialWeight';
+import { MAX_QUOTA_RESERVE_PERCENT, MIN_QUOTA_RESERVE_PERCENT } from '@/utils/quotaReserve';
 import { AuthFileExcludedModelsField } from './AuthFileExcludedModelsField';
 import { AuthFilePolicyFields } from './AuthFilePolicyFields';
 import { credentialPolicyError, readCredentialPolicy } from '../credentialPolicy';
@@ -157,6 +159,7 @@ export function AuthFileDetailsSheet(props: AuthFileDetailsSheetProps) {
               !editor?.json ||
               Boolean(editor?.headersTouched && editor.headersError) ||
               Boolean(editor?.weightError) ||
+              Boolean(editor?.quotaReserveError) ||
               Boolean(credentialPolicyError(editor?.policy))
             }
           >
@@ -239,6 +242,21 @@ export function AuthFileDetailsSheet(props: AuthFileDetailsSheetProps) {
                     disabled={disableControls || editor.saving || !editor.json}
                     onChange={(e) => onChange('weight', e.target.value)}
                   />
+                  {supportsAuthFileQuotaReserve(editor.providerKey) && (
+                    <Input
+                      label={t('auth_files.quota_reserve_label')}
+                      type="number"
+                      step="any"
+                      min={MIN_QUOTA_RESERVE_PERCENT}
+                      max={MAX_QUOTA_RESERVE_PERCENT}
+                      value={editor.quotaReserve}
+                      placeholder="0"
+                      hint={t('auth_files.quota_reserve_hint')}
+                      error={editor.quotaReserveError ?? undefined}
+                      disabled={disableControls || editor.saving || !editor.json}
+                      onChange={(e) => onChange('quotaReserve', e.target.value)}
+                    />
+                  )}
                   <div className="form-group">
                     <label>{t('auth_files.disable_cooling_label')}</label>
                     <ToggleSwitch

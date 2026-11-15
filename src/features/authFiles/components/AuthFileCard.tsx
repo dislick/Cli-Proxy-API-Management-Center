@@ -112,6 +112,10 @@ export function AuthFileCard(props: AuthFileCardProps) {
 
   const priorityValue = Number.isSafeInteger(file.priority) ? file.priority : undefined;
   const weightValue = Number.isSafeInteger(file.weight) ? file.weight : undefined;
+  const quotaReserveValue =
+    typeof file.quotaReservePercent === 'number' && file.quotaReservePercent > 0
+      ? file.quotaReservePercent
+      : undefined;
   const noteValue = typeof file.note === 'string' ? file.note.trim() : '';
   // Lead with account identity and use the file name as secondary text.
   const identity = deriveAuthFileIdentity(file);
@@ -246,6 +250,22 @@ export function AuthFileCard(props: AuthFileCardProps) {
             <span className={styles.metaWeight} title={t('auth_files.weight_tooltip')}>
               <span className={styles.metaMetricLabel}>{t('auth_files.weight_display')}</span>
               <span>{weightValue}</span>
+            </span>
+          </>
+        )}
+        {quotaReserveValue !== undefined && (
+          <>
+            <span className={styles.metaDivider} aria-hidden="true">
+              ·
+            </span>
+            <span
+              className={styles.metaReserve}
+              title={t('auth_files.quota_reserve_tooltip', { percent: quotaReserveValue })}
+            >
+              <span className={styles.metaMetricLabel}>
+                {t('auth_files.quota_reserve_display')}
+              </span>
+              <span>{quotaReserveValue}%</span>
             </span>
           </>
         )}

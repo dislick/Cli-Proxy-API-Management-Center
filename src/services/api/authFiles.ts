@@ -15,6 +15,7 @@ import {
   normalizeUsageTotal,
 } from '@/utils/recentRequests';
 import { parseTimestampMs } from '@/utils/timestamp';
+import { readQuotaReservePercent } from '@/utils/quotaReserve';
 import { normalizeAuthFileCooldowns, normalizeCooldownTimestamp } from './authFileCooldowns';
 
 type AuthFileStatusResponse = { status: string; disabled: boolean };
@@ -40,6 +41,8 @@ export type AuthFileFieldsPatch = {
   headers?: Record<string, string>;
   priority?: number;
   weight?: number | null;
+  /** Codex-only; null disables the reserve. */
+  quota_reserve_percent?: number | null;
   disable_cooling?: boolean;
   'disable-cooling'?: boolean;
   websockets?: boolean;
@@ -280,6 +283,7 @@ const normalizeAuthFileEntry = (
   const modified = readDateField(entry);
   const priority = readIntegerField(entry['priority']);
   const weight = readIntegerField(entry['weight']);
+  const quotaReservePercent = readQuotaReservePercent(entry['quota_reserve_percent']);
   const supportsQuota = readBooleanField(entry['supports_quota'] ?? entry.supportsQuota);
   const quotaProvider =
     readTextField(entry, 'quota_provider') || readTextField(entry, 'quotaProvider');
@@ -305,6 +309,7 @@ const normalizeAuthFileEntry = (
     ...(modified > 0 ? { modified } : {}),
     priority,
     weight,
+    ...(quotaReservePercent !== undefined ? { quotaReservePercent } : {}),
     ...(note ? { note } : {}),
     ...(email ? { email } : {}),
     ...(projectId ? { projectId } : {}),
