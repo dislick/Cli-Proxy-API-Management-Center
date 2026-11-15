@@ -323,7 +323,7 @@
   color: var(--text-secondary);
 }
 
-/* ---------- 元数据行：size · modified · priority · WRR weight ---------- */
+/* ---------- Metadata row: size · modified · priority · WRR weight · reserve ---------- */
 
 .metaRow {
   display: flex;
@@ -342,7 +342,8 @@
 }
 
 .metaPriority,
-.metaWeight {
+.metaWeight,
+.metaReserve {
   display: inline-flex;
   align-items: baseline;
   gap: 4px;
@@ -354,7 +355,8 @@
   white-space: nowrap;
 }
 
-.metaPriority {
+.metaPriority,
+.metaReserve {
   color: var(--text-secondary);
   background: color-mix(in srgb, var(--text-quaternary) 10%, transparent);
   border-color: color-mix(in srgb, var(--text-quaternary) 24%, transparent);

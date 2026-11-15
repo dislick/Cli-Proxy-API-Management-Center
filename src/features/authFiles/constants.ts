@@ -28,14 +28,7 @@ export type AuthFileModelItem = {
 export type AuthFileIconAsset = string | { light: string; dark: string };
 
 export type QuotaProviderType =
-  | 'antigravity'
-  | 'claude'
-  | 'codex'
-  | 'devin'
-  | 'kimi'
-  | 'meta'
-  | 'plugin'
-  | 'xai';
+  'antigravity' | 'claude' | 'codex' | 'devin' | 'kimi' | 'meta' | 'plugin' | 'xai';
 export type AuthFileQuotaFilter = string | null;
 export type OAuthConfigLoadError = 'loading' | 'unsupported' | 'load' | null;
 
@@ -237,6 +230,10 @@ export const applyAuthFileWebsockets = (
 };
 
 export const supportsAuthFileSiwc = (providerKey: string): boolean =>
+  normalizeProviderKey(providerKey) === 'codex';
+
+/** CPA accepts `quota_reserve_percent` above 0 only on Codex credentials. */
+export const supportsAuthFileQuotaReserve = (providerKey: string): boolean =>
   normalizeProviderKey(providerKey) === 'codex';
 
 export const readAuthFileUseSiwc = (value: Record<string, unknown>): boolean =>
