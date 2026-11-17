@@ -63,8 +63,9 @@ function parseSensitivePatternsReplace(raw: unknown): SensitivePatternReplacemen
   return raw.flatMap((item) => {
     const rule = asRecord(item);
     // RE2 validation belongs to the backend; never trim regexes or replacement text.
-    return typeof rule?.pattern === 'string' && typeof rule.replacement === 'string'
-      ? [{ pattern: rule.pattern, replacement: rule.replacement }]
+    return typeof rule?.pattern === 'string' &&
+      (rule.replacement == null || typeof rule.replacement === 'string')
+      ? [{ pattern: rule.pattern, replacement: rule.replacement ?? '' }]
       : [];
   });
 }
@@ -702,14 +703,14 @@ function parsePayloadReplaceRules(raw: unknown, document: YamlDocument): Payload
         tag.tag === 'tag:yaml.org,2002:int' && 'test' in tag && tag.test?.test(scalar.source ?? '')
     );
   };
-  if (raw === undefined) return [];
+  if (raw == null) return [];
   return (Array.isArray(raw) ? raw : [raw]).map((item, index) => {
     const record = asRecord(item);
     const target = asRecord(record?.target);
     let invalid = !Array.isArray(raw) || !record || !target;
-    if (target?.all !== undefined && typeof target.all !== 'boolean') invalid = true;
+    if (target?.all != null && typeof target.all !== 'boolean') invalid = true;
     if (
-      target?.positions !== undefined &&
+      target?.positions != null &&
       (!Array.isArray(target.positions) ||
         target.positions.some((value) => typeof value !== 'number' || !Number.isSafeInteger(value)))
     )
@@ -721,24 +722,24 @@ function parsePayloadReplaceRules(raw: unknown, document: YamlDocument): Payload
         const model = asRecord(value);
         if (!model || typeof model.name !== 'string') return true;
         for (const key of ['protocol', 'from-protocol']) {
-          if (model[key] !== undefined && typeof model[key] !== 'string') return true;
+          if (model[key] != null && typeof model[key] !== 'string') return true;
         }
         for (const key of ['match', 'not-match']) {
           if (
-            model[key] !== undefined &&
+            model[key] != null &&
             (!Array.isArray(model[key]) || model[key].some((condition) => !asRecord(condition)))
           )
             return true;
         }
         for (const key of ['exist', 'not-exist']) {
           if (
-            model[key] !== undefined &&
+            model[key] != null &&
             (!Array.isArray(model[key]) || model[key].some((path) => typeof path !== 'string'))
           )
             return true;
         }
         return (
-          model.headers !== undefined &&
+          model.headers != null &&
           (!asRecord(model.headers) ||
             Object.values(asRecord(model.headers)!).some((value) => typeof value !== 'string'))
         );
@@ -762,7 +763,7 @@ function parsePayloadReplaceRules(raw: unknown, document: YamlDocument): Payload
       invalid = true;
     const positionsNode = get(get(ruleNode, 'target'), 'positions');
     if (
-      positionsNode !== undefined &&
+      target?.positions != null &&
       (!isSeq(positionsNode) || positionsNode.items.some((node) => !isIntegerPosition(node)))
     ) {
       invalid = true;
@@ -777,7 +778,7 @@ function parsePayloadReplaceRules(raw: unknown, document: YamlDocument): Payload
         all: target?.all === true,
         positions: Array.isArray(target?.positions)
           ? target.positions.map(String).join(', ')
-          : target?.positions === undefined
+          : target?.positions == null
             ? ''
             : String(target.positions),
       },
@@ -1914,7 +1915,10 @@ export function useVisualConfig() {
 
   const applyVisualChangesToYaml = useCallback(
     (currentYaml: string, target: 'server' | 'draft' = 'server'): string => {
-      if (visualValues.payloadReplaceRules.some((rule) => getPayloadReplaceValidationError(rule))) {
+      if (
+        target === 'server' &&
+        visualValues.payloadReplaceRules.some((rule) => getPayloadReplaceValidationError(rule))
+      ) {
         throw new Error('Invalid payload.replace rules');
       }
       try {

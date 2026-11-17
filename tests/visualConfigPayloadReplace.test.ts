@@ -17,7 +17,8 @@ function unwrapPre(markup: string): string {
 
 function applyPayloadEdit(
   yaml: string,
-  edit: (values: VisualConfigValues) => Partial<VisualConfigValues>
+  edit: (values: VisualConfigValues) => Partial<VisualConfigValues>,
+  target: 'server' | 'draft' = 'server'
 ): string {
   function Harness() {
     const visualConfig = useVisualConfig();
@@ -30,7 +31,7 @@ function applyPayloadEdit(
       visualConfig.setVisualValues(edit(visualConfig.visualValues));
       setPhase(2);
     } else {
-      return createElement('pre', null, visualConfig.applyVisualChangesToYaml(yaml));
+      return createElement('pre', null, visualConfig.applyVisualChangesToYaml(yaml, target));
     }
     return null;
   }
@@ -73,6 +74,27 @@ const yaml = `requests:
 `;
 
 describe('payload replace pipeline', () => {
+  test('treats a null replacement list as empty and preserves it during unrelated saves', () => {
+    const source = 'requests: {payload: {replace: null}}';
+    expect(parseVisualValuesFromYaml(source).payloadReplaceRules).toEqual([]);
+    const output = applyPayloadEdit(source, () => ({ debug: true }));
+    expect(parseYaml(output).requests.payload.replace).toBeNull();
+    expect(parseYaml(output).observability.logs.debug).toBe(true);
+  });
+
+  test.each([
+    ...['protocol', 'from-protocol', 'headers', 'match', 'not-match', 'exist', 'not-exist'].map(
+      (field) => yaml.replace("name: '*'", `name: '*'\n            ${field}: null`)
+    ),
+    yaml.replace('positions: [1, 2]', 'positions: [1, 2]\n          all: null'),
+    yaml.replace('positions: [1, 2]', 'positions: null\n          all: true'),
+  ])('accepts optional null fields and preserves them on unrelated saves', (source) => {
+    const rule = parseVisualValuesFromYaml(source).payloadReplaceRules[0];
+    expect(getPayloadReplaceValidationError(rule)).toBeUndefined();
+    const output = applyPayloadEdit(source, () => ({ debug: true }));
+    expect(parseYaml(output).requests).toEqual(parseYaml(source).requests);
+  });
+
   test('preserves literal operands, order, comments and unknown fields', () => {
     const output = applyPayloadEdit(yaml, (values) => {
       const rule = values.payloadReplaceRules[0];
@@ -131,6 +153,30 @@ describe('payload replace pipeline', () => {
     expect(rule.invalid).toBe(true);
     expect(getPayloadReplaceValidationError(rule)).toBeDefined();
     expect(() => applyPayloadEdit(source, () => ({ debug: true }))).toThrow();
+    const draft = applyPayloadEdit(source, () => ({ debug: true }), 'draft');
+    expect(parseYaml(draft).requests).toEqual(parseYaml(source).requests);
+    expect(
+      getPayloadReplaceValidationError(parseVisualValuesFromYaml(draft).payloadReplaceRules[0])
+    ).toBeDefined();
+  });
+
+  test('materializes an incomplete replacement draft for YAML repair while blocking save', () => {
+    const edit = (values: VisualConfigValues): Partial<VisualConfigValues> => ({
+      payloadReplaceRules: [
+        {
+          ...values.payloadReplaceRules[0],
+          models: [],
+          replacements: [{ id: 'new-entry', from: '', to: '' }],
+        },
+      ],
+    });
+    expect(() => applyPayloadEdit(yaml, edit)).toThrow('Invalid payload.replace rules');
+    const draft = applyPayloadEdit(yaml, edit, 'draft');
+    expect(parseYaml(draft).requests.payload.replace[0].models).toEqual([]);
+    expect(parseYaml(draft).requests.payload.replace[0].replacements).toEqual([{ '': '' }]);
+    expect(
+      getPayloadReplaceValidationError(parseVisualValuesFromYaml(draft).payloadReplaceRules[0])
+    ).toBeDefined();
   });
 
   test('quoted sources, duplicate sources and positions survive serialize/reparse in order', () => {

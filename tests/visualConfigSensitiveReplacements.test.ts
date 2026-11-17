@@ -77,6 +77,35 @@ describe('visual config sensitive replacements', () => {
       expect(run(saved.output).values[patternsField]).toEqual(nextPatterns);
     });
 
+    test(`${provider}: preserves deletion rules with omitted or null replacements when editing`, () => {
+      const source = stringify({
+        oauth: {
+          providers: {
+            [provider]: {
+              'sensitive-patterns-replace': [
+                { pattern: 'delete-omitted' },
+                { pattern: 'delete-null', replacement: null },
+              ],
+            },
+          },
+        },
+      });
+      const deletionRules = [
+        { pattern: 'delete-omitted', replacement: '' },
+        { pattern: 'delete-null', replacement: '' },
+      ];
+      const loaded = run(source);
+      expect(loaded.values[patternsField]).toEqual(deletionRules);
+      expect(loaded.dirty).toEqual([]);
+      expect(parse(loaded.output)).toEqual(parse(source));
+
+      const nextPatterns = [...deletionRules, { pattern: 'added', replacement: 'updated' }];
+      const saved = run(source, [{ [patternsField]: nextPatterns }]);
+      expect(parse(saved.output).oauth.providers[provider]['sensitive-patterns-replace']).toEqual(
+        nextPatterns
+      );
+    });
+
     test(`${provider}: clears keys without removing unknown siblings`, () => {
       const cleared = run(yaml, [{ [wordsField]: {}, [patternsField]: [] }]);
       expect(parse(cleared.output).oauth.providers[provider]).toEqual({ 'future-option': true });
