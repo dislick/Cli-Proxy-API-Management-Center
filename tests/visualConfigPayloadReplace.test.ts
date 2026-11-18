@@ -342,6 +342,28 @@ ${yaml
     }
   );
 
+  test('rejects empty regex drafts without trimming valid patterns', () => {
+    const rule = parseVisualValuesFromYaml(yaml).payloadReplaceRules[0];
+    const draft = {
+      ...rule,
+      replacements: [{ ...rule.replacements[0], regex: true, from: '', to: 'replacement' }],
+    };
+    expect(getPayloadReplaceValidationError(draft)).toBe('payload_replace_invalid_replacements');
+    expect(() => applyPayloadEdit(yaml, () => ({ payloadReplaceRules: [draft] }))).toThrow();
+
+    for (const pattern of [' ', '(?i)(foo)']) {
+      const valid = {
+        ...draft,
+        replacements: [{ ...draft.replacements[0], from: pattern }],
+      };
+      expect(getPayloadReplaceValidationError(valid)).toBeUndefined();
+      const output = applyPayloadEdit(yaml, () => ({ payloadReplaceRules: [valid] }));
+      expect(parseYaml(output).requests.payload.replace[0].replacements).toEqual([
+        { pattern, replacement: 'replacement' },
+      ]);
+    }
+  });
+
   test('validates drafts and model conditions', () => {
     const rule = parseVisualValuesFromYaml(yaml).payloadReplaceRules[0];
     expect(getPayloadReplaceValidationError(rule)).toBeUndefined();

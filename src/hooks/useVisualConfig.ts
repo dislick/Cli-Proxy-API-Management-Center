@@ -680,7 +680,7 @@ export function getPayloadReplaceValidationError(rule: PayloadReplaceRule): stri
   if (
     rule.invalid ||
     !rule.replacements.length ||
-    rule.replacements.some((entry) => !entry.regex && !entry.from)
+    rule.replacements.some((entry) => !entry.from)
   ) {
     return 'payload_replace_invalid_replacements';
   }
